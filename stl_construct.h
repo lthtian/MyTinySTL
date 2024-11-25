@@ -2,7 +2,7 @@
 
 /*
 	两个配置器负责内存分配和销毁, 
-	该文件提供construct和destory, 负责对内存初始化和析构
+	该文件提供construct和destroy, 负责对内存初始化和析构
 */
 
 #include <new>
@@ -17,7 +17,7 @@ inline void construct(T1* p, const T2& value)
 
 // 单点析构
 template<class T>
-inline void destory(T* pointer)
+inline void destroy(T* pointer)
 {
 	pointer->~T(); 
 }
@@ -26,30 +26,30 @@ inline void destory(T* pointer)
 
 // 非平凡类型老实析构
 template<class ForwardIterator>
-inline void __destory_aux(ForwardIterator first, ForwardIterator last, __false_type)
+inline void __destroy_aux(ForwardIterator first, ForwardIterator last, __false_type)
 {
 	for (; first < last; ++first)
-		destory(&*first);
+		destroy(&*first);
 }
 
 // 平凡类型什么都不用做
 template<class ForwardIterator>
-inline void __destory_aux(ForwardIterator first, ForwardIterator last, __true_type) {}
+inline void __destroy_aux(ForwardIterator first, ForwardIterator last, __true_type) {}
 
 template<class ForwardIterator, class T>
-inline void __destory(ForwardIterator first, ForwardIterator last, T*)
+inline void __destroy(ForwardIterator first, ForwardIterator last, T*)
 {
 	typedef typename __type_traits<T>::has_trivial_destructor destructor;
-	__destory_aux(first, last, destructor());
+	__destroy_aux(first, last, destructor());
 }
 
 template<class ForwardIterator>
-inline void destory(ForwardIterator first, ForwardIterator last)
+inline void destroy(ForwardIterator first, ForwardIterator last)
 {
-	__destory(first, last, value_type(first));
+	__destroy(first, last, value_type(first));
 }
 
 
 
-inline void destory(char*, char*) {}
-inline void destory(wchar_t*, wchar_t*) {}
+inline void destroy(char*, char*) {}
+inline void destroy(wchar_t*, wchar_t*) {}

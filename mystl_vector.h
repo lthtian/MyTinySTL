@@ -67,7 +67,7 @@ namespace lth
 		vector(int n, const T& value) { fill_initialize(n, value); }
 		vector(long n, const T& value) { fill_initialize(n, value); }
 		explicit vector(size_type n) { fill_initialize(n, T()); }
-		~vector() { destory(start, finish); deallocate(); }
+		~vector() { destroy(start, finish); deallocate(); }
 
 
 		// 专属操作
@@ -127,12 +127,12 @@ namespace lth
 			}
 			catch (...)
 			{
-				destory(new_start, new_finish);
+				destroy(new_start, new_finish);
 				data_allocator::deallocate(new_start, len);
 				throw;
 			}
 
-			destory(begin(), end());
+			destroy(begin(), end());
 			deallocate();
 
 			start = new_start;
@@ -187,12 +187,12 @@ namespace lth
 			}
 			catch (...)
 			{
-				destory(new_start, new_finish);
+				destroy(new_start, new_finish);
 				data_allocator::deallocate(new_start, len);
 				throw;
 			}
 
-			destory(begin(), end());
+			destroy(begin(), end());
 			deallocate();
 
 			start = new_start;
@@ -205,7 +205,7 @@ namespace lth
 	void vector<T, Alloc>::pop_back()
 	{
 		--finish;
-		destory(finish);
+		destroy(finish);
 	}
 
 	// erase返回删除区间后的第一个有效迭代器
@@ -214,7 +214,7 @@ namespace lth
 	{
 		if (pos + 1 != end()) std::copy(pos + 1, finish, pos);
 		--finish;
-		destory(finish);
+		destroy(finish);
 		return pos;
 	}
 
@@ -222,7 +222,7 @@ namespace lth
 	typename vector<T, Alloc>::iterator vector<T, Alloc>::erase(iterator first, iterator last)
 	{
 		iterator i = std::copy(last, finish, first);
-		destory(i, finish);
+		destroy(i, finish);
 		finish = finish - (last - first);
 		return first;
 	}
