@@ -3,6 +3,7 @@
 #include "stl_uninitialized.h"
 #include "stl_construct.h"
 #include "stl_iterator.h"
+#include "type_traits.h"
 
 template<class T>
 struct __list_node
@@ -85,7 +86,9 @@ public:
 
 	typedef T value_type;
 	typedef value_type* pointer;
+	typedef const value_type* const_pointer;
 	typedef value_type& reference;
+	typedef const value_type& const_reference;
 	typedef size_t size_type;
 	typedef ptrdiff_t difference_type;
 
