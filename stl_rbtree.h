@@ -4,6 +4,7 @@
 #include "stl_construct.h"
 #include "stl_comparator.h"
 #include "stl_uninitialized.h"
+#include "stl_util.h"
 
 // 节点颜色
 typedef bool __rb_tree_color_type;
@@ -243,10 +244,10 @@ public:
 	// 构造
 	rb_tree(const Compare& comp = Compare())
 		:node_count(0), key_compare(comp) { init(); }
-	~rb_tree() { clear(), put_node(header); }
+	~rb_tree() { clear(), put_node(header); } // 补充clear
 
-	rb_tree<Key, T, KeyOfT, Compare, Alloc>&
-	operator==(const rb_tree<Key, T, KeyOfT, Compare, Alloc>& x);
+	//rb_tree<Key, T, KeyOfT, Compare, Alloc>&
+	//operator==(const rb_tree<Key, T, KeyOfT, Compare, Alloc>& x);
 
 public:
 	Compare key_comp() const { return key_compare; }
@@ -256,7 +257,179 @@ public:
 	size_type size() const { return node_count; }
 	size_type max_size() const { return size_type(-1); }
 
-	pair<iterator, bool> insert_unique(const value_type& x); // 补充pair
-	iterator insert_equal(const value_type& x);
+	pair<iterator, bool> insert_unique(const value_type& value); // 不允许重复插入
+	iterator insert_equal(const value_type& value);	// 允许重复插入
 };
+
+
+
+template<class Key, class T, class KeyOfT, class Compare, class Alloc>
+typename rb_tree<Key, T, KeyOfT, Compare, Alloc>::iterator
+rb_tree<Key, T, KeyOfT, Compare, Alloc>::insert_equal(const value_type& value)
+{
+	link_type fa = header;
+	link_type x = root();
+
+	while (x != 0)
+	{
+		fa = x;
+		x = key_compare()(KeyOfT()(value), key(x)) ? left(x) : right(x);
+	}
+	return __insert(x, fa, value);
+}
+
+template<class Key, class T, class KeyOfT, class Compare, class Alloc>
+pair<typename rb_tree<Key, T, KeyOfT, Compare, Alloc>::iterator, bool>
+rb_tree<Key, T, KeyOfT, Compare, Alloc>::insert_unique(const value_type& value)
+{
+	link_type fa = header;
+	link_type x = root();
+
+	bool flag = true;
+	while (x != 0)
+	{
+		fa = x;
+		flag = key_compare()(KeyOfT()(value), key(x));
+		x = flag ? left(x) : right(x);
+	}
+
+	iterator j = iterator(fa);
+	if (flag)	// 如果插入于左侧
+	{
+		// 本节点一定比父节点小
+		if (j == begin()) return pair<iterator, bool>(__insert(x, fa, value), true); // 如果父节点是最左节点, 说明本节点一定小于爷节点
+		else --j; // 如果父节点不是最左节点, 本节点与爷节点可能重复, 需要移到爷节点判断是否重复
+	}
+
+	if(key_compare(key(j.node), KeyOfT()(value)))
+		return pair<iterator, bool>(__insert(x, fa, value), true);
+
+	return pair<iterator, bool>(j, false);
+}
+
+
+template<class Key, class T, class KeyOfT, class Compare, class Alloc>
+typename rb_tree<Key, T, KeyOfT, Compare, Alloc>::iterator
+rb_tree<Key, T, KeyOfT, Compare, Alloc>::__insert(base_ptr x_, base_ptr y_, const value_type& v)
+{
+	link_type x = (link_type)x_;
+	link_type y = (link_type)y_;
+
+	link_type z;
+
+	if (y == header || x != nullptr || key_compare(KeyOfT()(v), key(y)))
+	{
+		z = create_node(v);
+		left(y) = z;
+
+		if (y == header)
+		{
+			root() = z;
+			rightmost() = z;
+		}
+		else if (y == leftmost())
+			leftmost() = z;
+	}
+	else
+	{
+		z = create_node(v);
+		right(y) = z;
+		if (y == rightmost()) rightmost() = z;
+	}
+	parent(z) = y;
+	left(z) = nullptr;
+	right(z) = nullptr;
+
+	__rb_tree_rebalance(z, header->parent);
+	++node_count;
+	return iterator(z);
+}
+
+
+// 左单旋
+inline void __rb_tree_rotate_left(__rb_tree_node_base* x, __rb_tree_node_base* root)
+{
+	__rb_tree_node_base* y = x->right; // y为旋转点的右子节点, y要顶替x的位置
+	x->right = y->left;
+	y->left->parent = x;
+	y->parent = x->parent;
+
+	if (x == root) root = y;
+	else if (x == x->parent->left) x->parent->left = y;
+	else x->parent->right = y;
+	
+	y->left = x;
+	x->parent = y;
+}
+
+inline void __rb_tree_rotate_right(__rb_tree_node_base* x, __rb_tree_node_base* root)
+{
+	__rb_tree_node_base* y = x->left; // y为旋转点的左子节点, y要顶替x的位置
+	x->left = y->right;
+	if (y->right != 0) y->right->parent = x;
+	y->parent = x->parent;
+
+	if (x == root) root = y;
+	else if (x == x->parent->right) x->parent->right = y;
+	else x->parent->left = y;
+	y->right = x;
+	x->parent = y;
+}
+
+
+// 从插入点由下至上检查, 判断是否左右旋的同时修改颜色
+inline void __rb_tree_rebalance(__rb_tree_node_base* x, __rb_tree_node_base* root)
+{
+	x->color = red; // 新节点必红
+	while (x != root && x->parent->color == red) // 向上修改颜色
+	{
+		// 找伯父
+		if (x->parent == x->parent->parent->left) 
+		{
+			__rb_tree_node_base* y = x->parent->parent->right;
+			if (y && y->color == red) // 右伯父且为红
+			{
+				x->parent->color = black;
+				y->color = black;
+				x->parent->parent->color = red;
+				x = x->parent->parent;
+			}
+			else // 无伯父, 或伯父为黑 // 说明高度差有问题, 要旋转
+			{
+				if (x == x->parent->right) // 新节点为父节点的右子节点, 进行左右双旋
+				{
+					x = x->parent;
+					__rb_tree_rotate_left(x, root);
+				}
+				x->parent->color = black;
+				x->parent->parent->color = red;
+				__rb_tree_rotate_right(x->parent->parent, root);
+			}
+		}
+		else  // 父是祖父的右节点
+		{
+			__rb_tree_node_base* y = x->parent->parent->left;
+			if (y && y->color == red) // 右伯父且为红
+			{
+				x->parent->color = black;
+				y->color = black;
+				x->parent->parent->color = red;
+				x = x->parent->parent;
+			}
+			else // 无伯父, 或伯父为黑 // 说明高度差有问题, 要旋转
+			{
+				if (x == x->parent->left) // 新节点为父节点的左子节点, 进行右左双旋
+				{
+					x = x->parent;
+					__rb_tree_rotate_right(x, root);
+				}
+				x->parent->color = black;
+				x->parent->parent->color = red;
+				__rb_tree_rotate_left(x->parent->parent, root);
+			}
+		}
+	}
+	root->color = black; // 根节点永远为黑
+}
+
 
